@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id                String    @id @default(uuid())
+  phone             String?   @unique
+  email             String?   @unique
+  password          String
+  nickname          String?
+  avatarUrl         String?
+  defaultCurrency   String    @default("CNY")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  expenses          Expense[]
+  families          FamilyMember[]
+  tags              Tag[]
+  
+  @@map("users")
+}
+
+// 标签模型
+model Tag {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#1890ff")
+  icon      String?
+  isSystem  Boolean  @default(false)
+  userId    String?
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("tags")
+}
+
+// 支出记录
+model Expense {
+  id          String    @id @default(uuid())
+  userId      String
+  familyId    String?
+  
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String    @default("CNY")
+  name        String
+  description String?
+  category    String    @default("other")
+  expenseDate DateTime  @db.Date
+  
+  splitType   SplitType @default(NONE)
+  splitConfig Json?
+  
+  images      String[]
+  tagIds      String[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family      Family?   @relation(fields: [familyId], references: [id])
+  timeSplits  TimeSplitDetail[]
+  countSplits CountSplitRecord[]
+  familySplits FamilyExpenseSplit[]
+  
+  @@map("expenses")
+}
+
+// 时间分摊明细
+model TimeSplitDetail {
+  id          String    @id @default(uuid())
+  expenseId   String
+  date        DateTime  @db.Date
+  amount      Decimal   @db.Decimal(10, 2)
+  isSettled   Boolean   @default(false)
+  
+  expense     Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  
+  @@map("time_split_details")
+}
+
+// 次数分摊记录
+model CountSplitRecord {
+  id          String    @id @default(uuid())
+  expenseId   String
+  usedCount   Int
+  usedDate    DateTime  @default(now())
+  note        String?
+  
+  expense     Expense   @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  
+  @@map("count_split_records")
+}
+
+// 家庭/群组
+model Family {
+  id               String    @id @default(uuid())
+  name             String
+  createdBy        String
+  defaultSplitRule SplitRule @default(EQUAL)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  members   FamilyMember[]
+  expenses  Expense[]
+  
+  @@map("families")
+}
+
+// 家庭成员
+model FamilyMember {
+  id       String     @id @default(uuid())
+  familyId String
+  userId   String
+  role     MemberRole @default(MEMBER)
+  nickname String?
+  joinDate DateTime   @default(now())
+  
+  family   Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  splits   FamilyExpenseSplit[]
+  
+  @@unique([familyId, userId])
+  @@map("family_members")
+}
+
+// 家庭支出分摊记录
+model FamilyExpenseSplit {
+  id         String  @id @default(uuid())
+  expenseId  String
+  memberId   String
+  shouldPay  Decimal @db.Decimal(10, 2)
+  paid       Decimal @default(0) @db.Decimal(10, 2)
+  splitRatio Decimal @db.Decimal(5, 2)
+  
+  expense  Expense      @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  member   FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  @@map("family_expense_splits")
+}
+
+enum SplitType {
+  NONE
+  TIME
+  COUNT
+}
+
+enum SplitRule {
+  EQUAL
+  INCOME
+  CUSTOM
+}
+
+enum MemberRole {
+  ADMIN
+  MEMBER
+}

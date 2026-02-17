@@ -1,0 +1,53 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [ develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      working-directory: ./apps/sharebill_app
+      run: flutter pub get
+      
+    - name: Analyze code
+      working-directory: ./apps/sharebill_app
+      run: flutter analyze --no-pub
+      
+    - name: Run tests
+      working-directory: ./apps/sharebill_app
+      run: flutter test --no-pub
+      continue-on-error: true
+      
+    - name: Build Debug APK
+      working-directory: ./apps/sharebill_app
+      run: flutter build apk --debug
+      
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sharebill-debug-apk
+        path: apps/sharebill_app/build/app/outputs/flutter-apk/app-debug.apk
+        retention-days: 5
