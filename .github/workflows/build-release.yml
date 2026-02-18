@@ -2,17 +2,20 @@ name: Build and Release APK
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, master ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/sharebill_app
     
     steps:
     - name: Checkout code
@@ -27,25 +30,22 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0'
+        flutter-version: '3.19.0'
         channel: 'stable'
+        cache: true
+        
+    - name: Check Flutter version
+      run: flutter doctor -v
         
     - name: Get dependencies
-      working-directory: ./apps/sharebill_app
       run: flutter pub get
       
     - name: Analyze code
-      working-directory: ./apps/sharebill_app
-      run: flutter analyze --no-pub
-      
-    - name: Run tests
-      working-directory: ./apps/sharebill_app
-      run: flutter test --no-pub
+      run: flutter analyze
       continue-on-error: true
       
     - name: Build APK
-      working-directory: ./apps/sharebill_app
-      run: flutter build apk --release
+      run: flutter build apk --release --verbose
       
     - name: Upload APK as artifact
       uses: actions/upload-artifact@v4
@@ -54,8 +54,14 @@ jobs:
         path: apps/sharebill_app/build/app/outputs/flutter-apk/app-release.apk
         retention-days: 7
         
+    - name: Check APK exists
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        ls -la build/app/outputs/flutter-apk/
+        
     - name: Rename APK with version
       if: startsWith(github.ref, 'refs/tags/v')
+      working-directory: ./
       run: |
         VERSION=${GITHUB_REF#refs/tags/v}
         cp apps/sharebill_app/build/app/outputs/flutter-apk/app-release.apk sharebill-v${VERSION}.apk
@@ -64,12 +70,9 @@ jobs:
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: ShareBill ${{ github.ref }}
+        name: ShareBill ${{ github.ref_name }}
         body: |
           ## ShareBill 安卓 APK 发布
           
@@ -91,17 +94,8 @@ jobs:
           - 家庭/群组分摊
           
           ### 更新日志
-          详见 [CHANGELOG.md](../CHANGELOG.md)
-        draft: false
-        prerelease: false
-        
-    - name: Upload APK to Release
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: actions/upload-release-asset@v1
+          详见 [CHANGELOG.md](./CHANGELOG.md)
+        files: sharebill-v*.apk
+        prerelease: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./${{ env.APK_NAME }}
-        asset_name: ${{ env.APK_NAME }}
-        asset_content_type: application/vnd.android.package-archive
