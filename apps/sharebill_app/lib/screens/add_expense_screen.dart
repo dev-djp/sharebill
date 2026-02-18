@@ -259,8 +259,3 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 }
 
-enum SplitType {
-  none,
-  time,
-  count,
-}
