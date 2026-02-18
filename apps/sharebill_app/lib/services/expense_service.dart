@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'auth_service.dart';
 
 final expenseServiceProvider = Provider<ExpenseService>((ref) {
   return ExpenseService(ref);
