@@ -1,0 +1,20 @@
+# 使用 Docker 构建 Flutter APK
+FROM cirrusci/flutter:3.19.0 AS builder
+
+WORKDIR /app
+
+# 复制项目文件
+COPY apps/sharebill_app/pubspec.yaml ./
+COPY apps/sharebill_app/pubspec.lock ./
+RUN flutter pub get
+
+COPY apps/sharebill_app/ ./
+RUN flutter pub get
+
+# 构建 APK
+RUN flutter build apk --release
+
+# 输出
+FROM alpine:latest
+WORKDIR /output
+COPY --from=builder /app/build/app/outputs/flutter-apk/app-release.apk ./
